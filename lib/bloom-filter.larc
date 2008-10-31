@@ -1,0 +1,172 @@
+
+Bloom Filters
+=============
+
+[Bloom filters][1] are a compact data structure for representing
+membership sets.  They have O(m) size and O(k) time for lookup
+and insertion (where `m` and `k` are programmer-chosen constants).
+
+<!--Links -->
+[1]: <http://en.wikipedia.org/wiki/Bloom_filter>
+     "Bloom filter - Wikipedia"
+
+This library will work with <arc>v3.
+
+    (in-package bloom-filter)
+    (using <arc>v3)
+    (using <arc>v3-bitops-exp)
+
+Bloom filters use a bit array, and thus require the bit
+operations.  The bit operations are currently in an experimental
+interface but they are expected to be included in Arc4F.
+
+    (interface v1
+      ; the type
+      bloom-filter
+      ; the constructors
+      blmflt
+      blmflt-k)
+
+The `bloom-filter` type is the type of the object constructed by
+the `blmflt` and `blmflt-k` constructors.  `blmflt` will accept a
+hashing function which returns a set of `k` keys, while blmflt-k
+will accept a hashing function that returns a single key, but
+perturbed by a given key index.
+
+If the above paragraph doesn't make much sense, I'll describe a
+little bit about what a bloom filter needs.  For a single
+element, the bloom filter requires `k` different hash keys, where
+`k` is a programmer-chosen value that is usually far larger than
+1; this means writing `k` different hash functions.  Of course,
+designing hash functions is not trivial.  What you can do is use
+a "large" hash function, such as SHA-1 (which returns a 256-bit
+hash) and split that into smaller hashes.  Note however that the
+smaller hashes should still be able to express the separate
+number `m`.
+
+    (interface v1-direct
+      v1
+      ; direct accessors
+      blmflt-ref blmflt-sref)
+
+The direct accessors are useful if you absolutely *know* that a
+piece of data will be a bloom filter, you want to eliminate the
+overhead of method dispatching on `call*` and `sref`, and you're
+willing to tolerate the relative ugliness of inserting the direct
+accessors.  Their use is deprecated, however.
+
+    (interface v1-serialize
+      v1
+      blmflt-write
+      blmflt-read
+      blmflt-num)
+
+The serializing functions are used to save and reconstruct a
+bloom filter to and from a port; they are intended for saving the
+data on-disk.  `blmflt-write` serializes the number to a port as
+compactly as feasible, `blmflt-read` reads back the number, and
+blmflt-num simply returns the data directly, which you can
+serialize using your own scheme.
+
+The basic data structure is:
+
+    (def bloom-filter (number k-hasher m)
+      (annotate 'bloom-filter
+        (list number k-hasher m)))
+
+The first public constructors for the data structure is:
+
+    (def blmflt (k-hasher m (o number 0))
+      " Creates a bloom filter `m' bits wide with a hash function
+        returning `k' values in a sequence.  The data of the
+        bloom filter is `number', which defaults to 0.
+        The element type of the bloom filter is the same type as
+        the value accepted by the `k-hasher` function.
+        Example:
+          (blmflt [w/collect:for i 1 K
+                    (collect (sshash:string i _))]
+                  M)
+        See also [[blmflt-k]] "
+      (bloom-filter number k-hasher m))
+
+Notice how the `k-hasher` function is specified: it's a function
+which accepts one parameter.  It returns all `k` hashes for that
+parameter in a sequence.
+
+This constructor also accepts an optional `number` argument.
+This argument is intended to be used in conjunction with
+`blmflt-read` to reconstruct the bloom filter function from a
+saved format.
+
+The second public constructor accepts a different function
+signature for the hasher:
+
+    (def blmflt-k (hasher-k k m (o number 0))
+      " Creates a bloom filter `m' bits wide with a hash
+        function that can accept perturbation indices from 0
+        to `k' - 1.  The data of the bloom filter is `number',
+        which defaults to 0.
+        The element type of the bloom filter is the same type
+        as the value accepted by `hasher-k' for the second
+        argument.
+        Example:
+          (blmflt-k (fn (k s)
+                      (sshash:string k s))
+                    K
+                    M)
+        See also [[blmflt]] "
+      (let k-1 (- k 1)
+        (blmflt [w/collect:for i 0 k-1
+                  (collect (hasher-k i _))]
+                m
+                number)))
+
+We then describe the behaviour of looking up and adding an
+element to the bloom filter:
+
+    (def blmflt-ref (bf e)
+      " Looks up the element `e' in the bloom filter `bf'.
+        Deprecated; preferably use (bf e) syntax. "
+      (blmflt-ref-internal (rep bf) e))
+    (def blmflt-ref-internal ((number k-hasher m) e)
+      (all [isnt 0
+                 (bit-and number
+                          (bit-shift 1
+                            (mod _ m)))]
+           (k-hasher e)))
+
+We also support the use of `(bf e)` syntax by defining a
+`defcall` for our type:
+
+    (defcall bloom-filter (bf-r e)
+      ; 'defcall always gives the representation
+      (blmflt-ref-internal bf-r e))
+
+It simply uses the helper function above.
+
+Adding an element requires us to set all the necessary bits in
+the representation's number.
+
+    (def blmflt-sref (bf e)
+      " Adds the element `e' to the bloom filter `bf'.
+        Deprecated; preferably use (= (bf e) t) or
+        (assert (bf e)) "
+      (let (_ k-hasher m) (rep bf)
+        (zap [reduce bit-or
+                     (map [bit-shift 1 (mod _ m)] (k-hasher e))
+                     ; initial value
+                     _]
+             ((rep bf) 0)))
+      e)
+
+In order to support the preferred syntax, we overload `sref`:
+
+    (defm sref ((t bf bloom-filter) v e)
+      ; bloom filters can't delete and can't associate any
+      ; data with the key, can only register presence
+      (if (isnt v t)
+          (err "can only set value in bloom filter to `t' - " v))
+      (blmflt-sref bf e)
+      t)
+
+

@@ -1,0 +1,101 @@
+
+The primary design goal for Arc-F is to allow interoperability of
+diverse libraries written by diverse programmers.
+
+In my opinion, this precludes the use of a *global* readtable or
+a *global* ssyntaxer.  Instead, a readtable/ssyntaxer should be
+definable on a per-project (or similar finer grain) basis.
+
+Since Arc-F already provides a "contexter" object which is
+typically used on a per-file basis, I propose that any ssyntax
+redefining scheme use the "contexter" object.  In fact, there are
+currently two reserved unpackaged symbols for contexting which I
+intend to use for ssyntaxes, 'import-ssyntax and
+'interface-ssyntax.
+
+Here are some characteristics which I think are important for any
+proposed ssyntax redefinition scheme (in order of decreasing
+importance, as I see it):
+
+1.  Non-global.
+
+This prevents many unexpected problems with multiple libraries
+defining and using the same ssyntax for different meanings.  If
+ssyntaxes can be limited to the scope of a project, or the scope
+of some other finer grain other than the entire Arc process, then
+such problems are not going to exist at all.
+
+This is assured by using contexts.
+
+2.  Attached to package interfaces.
+
+If in the future, PG decides to add an ssyntax in Arc3, we should
+be able to release a similar ssyntax for Arc4F (or later).
+*However*, it would be preferable for a program written for Arc3F
+to run on Arc4F (or later) without excessive modification, even if
+that program uses that ssyntax for non-ssyntax purposes.
+
+*For example*, if tomorrow PG releases the `$foo` syntax to mean
+`(fn () foo)`, then an existing Arc3F program which uses the
+variable `$-earned` should still run on Arc4F, preferably without
+modification.  *End of example*
+
+This means that unless the program is specifically modified to
+use <arc>v4 instead of <arc>v3, it will *not* use the new $foo
+syntax.  Only if a program specifically uses <arc>v4 will the new
+ssyntax be enabled.
+
+3.  Allow mixing of ssyntax from different libraries.
+
+This is a very complex requirement, but this is very desirable
+and a ssyntax redefinition scheme which can achieve this
+requirement would give us even better interoperability.
+
+Specifically, it would allow two (or more) different libraries
+that define non-overlapping ssyntaxes to be joined into a single
+interface by a third library, which would effectively be our
+"merging library".
+
+*For example*, consider two libraries, andf-ss and orf-ss.
+
+andf-ss defines the ssyntax `foo&&bar` as `(andf foo bar)`, while
+orf-ss defines the ssyntax `foo//bar` as `(orf foo bar)`.
+
+Since both libraries use nonconflicting definitions, it would be
+desirable to be able to use both their ssyntaxes in a single
+application or library.  Preferably, this should be doable in a
+short declaration, but it is acceptable to have to do this in a
+separate small "merging" library.  *End of example*
+
+3.1.  Allow user-controlled declarations of relative precedence.
+
+*Returning to the previous example*, even if we were to allow
+both new ssyntaxes to be used in the same application or library,
+it would be preferable to define their precedence to each other.
+This is because something like `foo&&bar//quux` would be
+otherwise ambiguous: does this mean `(orf (andf foo bar) quux)`
+or `(andf foo (orf bar quux))`?
+
+This is the problem of precedence.  It would be desirable for the
+user to be able to specify the precedence.
+
+For the sake of discussion, let us also suppose that the writer
+of andf-ss is different from the writer of orf-ss, and that
+neither of them are willing to communicate with the other (just
+because, okay?  LOL).  *End of Example*
+
+This means that a number-based precedence level may not be fully
+general, because the chosen numbers may not reflect what the end
+user may actually desire; further, getting the library writers to
+change their libraries may not be possible.
+
+My proposal is that instead of using numeric precedence, we
+instead use a system of defining an ssyntax as being "higher" or
+"lower" another ssyntax.  This allows for generality, but it
+would have the cost of making the precedence description longer.
+It may be acceptable to use a system where the higher and lower
+declarations are optional, in which case the user is "in his or
+her own", so to speak, and using multiple different ssyntaxes in
+a single symbol will be ambiguous (preferably throwing an error).
+
+
