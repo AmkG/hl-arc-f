@@ -1,0 +1,10 @@
+This is a version of arc-f which will be used
+to bootstrap the hl bytecode compiler.
+
+The main hl project is here:
+	http://github.com/AmkG/hl/tree/master
+
+It is not intended for public use; in particular,
+the interfaces may be changed without warning,
+regardless of the previous publication state.
+
