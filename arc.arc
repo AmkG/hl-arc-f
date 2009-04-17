@@ -185,6 +185,7 @@
   ; other traversal structures
   recstring trav trav+
   ontable
+  index
   ; collecting structures
   w/collect w/scanner-collect-each
   w/collect-on
