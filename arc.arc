@@ -145,7 +145,7 @@
   readall
   saferead
   ; scanner traversal
-  car cdr caar cadr cdar cadr
+  car cdr caar cadr cdar cadr cddr
   carif
   nthcdr last
   each
