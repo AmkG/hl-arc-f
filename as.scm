@@ -55,6 +55,7 @@
   (aload ~/.arcshrc))
 
 ; If we have command-line arguments.
+(xdef '<arc>argv (vector->list argv))
 (if (> (vector-length argv) 0)
   ; If we have a command line argument that represents a file-name of
   ; a program.
@@ -63,4 +64,3 @@
     (exit))
   ; else
   (tl))
-
