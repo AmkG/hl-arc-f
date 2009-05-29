@@ -881,6 +881,12 @@
     (#t
       (err "'symeval accepts exactly one parameter, none given"))))
 
+(define (symeval s)
+  (namespace-variable-value (ac-global-name s) 
+									 #t 
+									 (lambda () 
+										(err "symeval: unbound symbol"))))
+
 ; compile a function call
 ; special cases for speed, to avoid compiled output like
 ;   (ar-apply __pr (list 1 2))
